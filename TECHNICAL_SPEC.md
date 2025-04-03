@@ -247,71 +247,148 @@ actionType	String	"take" or "return". (Alternatively, separate logs if needed)
 
 
 6. Implementation Plan
- 1. Project Setup
+    1. Project Setup
 
-    * Initialize a Git repository.
+        * Initialize a Git repository.
 
-    * Create a Cordova project for the mobile app.
+        * Create a Cordova project for the mobile app.
 
-    * Set up a Node.js/Express backend with a basic folder structure.
+        * Set up a Node.js/Express backend with a basic folder structure.
 
-    * Configure MongoDB Atlas connection.
+        * Configure MongoDB Atlas connection.
 
- 2. Backend Development
+    2. Backend Development
 
-    * Models/Schemas for users, reagents, logs.
+        * Models/Schemas for users, reagents, logs.
 
-    * Routes/Controllers for:
+        * Routes/Controllers for:
 
-        - Authentication (login/register)
+            - Authentication (login/register)
 
-        - CRUD for reagents (matStored)
+            - CRUD for reagents (matStored)
 
-        - Logging transactions (matTaken)
+            - Logging transactions (matTaken)
 
-        - File uploads (images, PDFs)
+            - File uploads (images, PDFs)
 
-    * Security: add role-check middleware for admin-only routes.
+        * Security: add role-check middleware for admin-only routes.
 
- 3. Cordova App
+    3. Cordova App
 
-    * Basic views: Login, Search, Reagent Details, Take/Return.
+        * Basic views: Login, Search, Reagent Details, Take/Return.
 
-    * Use REST API calls to the Node.js server.
+        * Use REST API calls to the Node.js server.
 
-    * Display in-app notifications (maybe a simple “notifications” screen or banner).
+        * Display in-app notifications (maybe a simple “notifications” screen or banner).
 
- 4. Web Interface
+    4. Web Interface
 
-    * Either reuse Cordova code (via a shared codebase) or build a separate small front-end.
+        * Either reuse Cordova code (via a shared codebase) or build a separate small front-end.
 
-    * Ensure it’s responsive for desktop usage.
+        * Ensure it’s responsive for desktop usage.
 
- 5. Notifications
+    5. Notifications
 
-    * Implement a simple in-app notification system:
+        * Implement a simple in-app notification system:
 
-        - A page or panel showing notifications for the logged-in user (overdue returns, near expiration items, etc.).
+            - A page or panel showing notifications for the logged-in user (overdue returns, near expiration items, etc.).
 
-        - Provide admin an interface to configure or manually trigger notifications.
+            - Provide admin an interface to configure or manually trigger notifications.
 
- 6. Testing
+    6. Testing
 
-    * Backend: Write unit tests for routes (using Jest, Mocha, or similar).
+        * Backend: Write unit tests for routes (using Jest, Mocha, or similar).
 
-    * Mobile: Manual testing on an Android device or emulator.
+        * Mobile: Manual testing on an Android device or emulator.
 
-    * Web: Manual testing in Chrome/Firefox + possibly basic automation with Cypress or similar.
+        * Web: Manual testing in Chrome/Firefox + possibly basic automation with Cypress or similar.
 
- 7. Deployment
+    7. Deployment
 
-    * Deploy Node.js server to a free hosting platform (e.g., Render, Railway, or Heroku’s free tier if available).
+        * Deploy Node.js server to a free hosting platform (e.g., Render, Railway, or Heroku’s free tier if available).
 
-    * Use free-tier MongoDB Atlas.
+        * Use free-tier MongoDB Atlas.
 
-    * Generate an Android APK from Cordova for internal distribution.
+        * Generate an Android APK from Cordova for internal distribution.
 
-    * Provide a URL for the web version.
+        * Provide a URL for the web version.
+
+7. Frontend Functional Addendum
+    1. Taking Out & Returning Reagents
+
+         * A reagent can be in one of two states: in storage (inStorage = true) or taken out (inStorage = false).
+
+         * Take Out:
+
+             * No immediate amount is prompted (the user might not know how much they will eventually use).
+
+             * Creates a matTaken log entry (actionType = "take") with takenAmount = 0.
+
+             * inStorage is set to false.
+
+         * Register Usage (Partial Consumption):
+
+             * While the reagent is out, the same user can log one or more “usage” events (actionType = "use"), each time specifying how much they used.
+
+             * The system checks if the usage exceeds remainAmount. If it does, it warns the user that an admin correction might be needed.
+
+             * This repeated usage can happen until the user returns the reagent.
+
+         * Return:
+
+             * If no usage has been logged since the last “take” event, the system warns: “You forgot to register any consumption. Are you sure?”
+
+             * If the user confirms, we log a return event. The reagent goes back to inStorage = true.
+
+    2. Notifications
+
+        * User-Specific Notifications: A user sees only the notifications meant for them (matched by userID in the notifications array) or null for system-wide.
+
+        * Admin Notifications: Admin can view all notifications.
+
+        * Potential triggers for notifications in the real app could be:
+
+            - Low stock alerts
+
+            - Overdue returns
+
+            - Correction requests
+
+    3. Admin Panel
+
+        * All Notifications: The admin sees every notification in the system, with details of date, message, and the user ID.
+
+        * Manage Users: A simple read-only list in the demo. Real functionality could allow role changes, deletions, etc.
+
+        * Manage Reagents: A basic listing with remain amounts. In the real app, the admin could edit remain amounts or other details from here.
+
+    4. Data Validation
+
+        * The UI checks if the user tries to register usage with a negative or non-numeric amount. It also warns if usage is bigger than the recorded remain.
+
+        * A future improvement could add a “Request Correction” button that sends a special notification to the admin.
+
+    5. Security & Roles
+
+        * Regular Users:
+
+            - See only their notifications.
+
+            - Can take out or return a reagent only if it’s in storage (take out) or if they themselves have it (return).
+
+            - Can register usage if they currently have the reagent checked out.
+
+        * Admin Users:
+
+            - Have full visibility of notifications, user list, and reagent list (the “Admin Panel”).
+
+            - In the final app, admins would also handle correction requests or forcibly return items if needed.
+
+    6. UI/UX Considerations
+
+        * Collapsible sections are used to keep the main details screen simpler (key info at the top, advanced info and usage history hidden by default).
+
+        * The navigation bar toggles for mobile (hamburger menu) using Bootstrap’s default components.
 
 
 7. Future Enhancements
@@ -324,3 +401,4 @@ actionType	String	"take" or "return". (Alternatively, separate logs if needed)
     * Advanced Reporting: Monthly usage stats, cost tracking, etc.
 
     * 2FA: Add TOTP (e.g., Google Authenticator) if security needs increase.
+

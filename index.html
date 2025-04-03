@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Reagent Tracker Demo</title>
+    <!-- Bootstrap CSS -->
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <style>
+      .screen {
+        display: none;
+      }
+      .active-screen {
+        display: block;
+      }
+      .pointer {
+        cursor: pointer;
+      }
+      .navbar-dark .navbar-toggler-icon {
+        background-image: url("data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 30 30' " + "xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke='rgba%28%255, %255, " + "%255, 0.5%29' stroke-width='2' stroke-linecap='round' " + "stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+      }
+      .collapse-content {
+        margin-left: 1rem;
+      }
+      .usage-table td,
+      .usage-table th {
+        padding: 0.4rem 0.6rem;
+      }
+      /* A simple highlight for "Admin Panel" areas */
+      .admin-section {
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 0.8rem;
+        margin-top: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- NAVIGATION BAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <a class="navbar-brand" href="#">Reagent Tracker</a>
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-toggle="collapse"
+        data-target="#navbarNav"
+        aria-controls="navbarNav"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav mr-auto" id="navLinks">
+          <!-- Populated after login -->
+        </ul>
+        <span class="navbar-text" id="currentUserInfo"></span>
+      </div>
+    </nav>
+
+    <!-- MAIN CONTAINER -->
+    <div class="container mt-4">
+      <!-- LOGIN SCREEN -->
+      <div id="loginScreen" class="screen active-screen">
+        <h3>Login</h3>
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="emailInput">Email</label>
+            <input type="email" class="form-control" id="emailInput" required />
+          </div>
+          <div class="form-group">
+            <label for="passwordInput">Password</label>
+            <input
+              type="password"
+              class="form-control"
+              id="passwordInput"
+              required
+            />
+          </div>
+          <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+      </div>
+
+      <!-- SEARCH SCREEN -->
+      <div id="searchScreen" class="screen">
+        <h3>Search Reagents</h3>
+        <div class="form-group">
+          <input
+            type="text"
+            class="form-control"
+            id="searchInput"
+            placeholder="Search by name, synonym, or CAS"
+          />
+        </div>
+        <table class="table table-bordered table-hover">
+          <thead>
+            <tr>
+              <th>Material ID</th>
+              <th>Name</th>
+              <th>Shelf / Status</th>
+              <th>Remaining</th>
+            </tr>
+          </thead>
+          <tbody id="reagentsTableBody">
+            <!-- Filled by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- DETAILS SCREEN -->
+      <div id="detailsScreen" class="screen">
+        <h3>Reagent Details</h3>
+        <div id="detailsContent" class="mb-2">
+          <!-- Filled by JS -->
+        </div>
+        <button class="btn btn-secondary" id="backToSearchBtn">
+          Back to Search
+        </button>
+      </div>
+
+      <!-- NOTIFICATIONS SCREEN -->
+      <div id="notificationsScreen" class="screen">
+        <h3>My Notifications</h3>
+        <ul class="list-group" id="notificationsList">
+          <!-- Filled by JS -->
+        </ul>
+      </div>
+
+      <!-- ADMIN SCREEN (for Admin users) -->
+      <div id="adminScreen" class="screen">
+        <h3>Admin Panel</h3>
+        <p>
+          This screen is only visible to users with the
+          <strong>admin</strong> role.
+        </p>
+
+        <!-- Manage Notifications -->
+        <div class="admin-section">
+          <h5>All Notifications</h5>
+          <table class="table table-sm table-bordered">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Message</th>
+                <th>To UserID</th>
+              </tr>
+            </thead>
+            <tbody id="adminNotificationsTable">
+              <!-- All notifications appear here for admin -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Manage Users -->
+        <div class="admin-section">
+          <h5>All Users</h5>
+          <table class="table table-sm table-bordered">
+            <thead>
+              <tr>
+                <th>UserID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersTable">
+              <!-- All users appear here for admin -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Manage Reagents (basic listing for editing) -->
+        <div class="admin-section">
+          <h5>All Reagents</h5>
+          <table class="table table-sm table-bordered">
+            <thead>
+              <tr>
+                <th>MatID</th>
+                <th>Name</th>
+                <th>Remaining</th>
+                <th>Shelf</th>
+              </tr>
+            </thead>
+            <tbody id="adminReagentsTable">
+              <!-- All reagents appear here for admin -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- jQuery & Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+      /*
+       * MOCK DATA
+       */
+      let mockUsers = [
+        {
+          userID: 1,
+          userName: "Admin User",
+          userEmail: "admin@company.com",
+          role: "admin",
+        },
+        {
+          userID: 2,
+          userName: "Regular User",
+          userEmail: "user@company.com",
+          role: "regular",
+        },
+      ];
+
+      let currentUser = null;
+
+      // mock reagents
+      let mockReagents = [
+        {
+          materialID: 1,
+          WHcode: "7468-1/1-268",
+          chemName: "Tetrahydrofuran THF, dry",
+          synonyms: ["1,4-Butylene oxide", "Cyclotetramethylene oxide"],
+          bruttoF: "(CH2)3CH2O",
+          CASnum: "109-99-9",
+          retestExp: "2026-01-16",
+          arrived: "2022-01-01",
+          orderAmount: 200.0,
+          remainAmount: 100.0,
+          units: "L",
+          shelf: "Kelder",
+          MSDS: "msds1.pdf",
+          storageTemp: "15-25°C",
+          image: "https://via.placeholder.com/150",
+          inStorage: true,
+        },
+        {
+          materialID: 2,
+          WHcode: "1234-1/1-456",
+          chemName: "Acetone",
+          synonyms: ["Propanone"],
+          bruttoF: "C3H6O",
+          CASnum: "67-64-1",
+          retestExp: "2025-12-31",
+          arrived: "2021-05-20",
+          orderAmount: 50.0,
+          remainAmount: 25.0,
+          units: "L",
+          shelf: "Shelf 3",
+          MSDS: "msds2.pdf",
+          storageTemp: "15-25°C",
+          image: "https://via.placeholder.com/150",
+          inStorage: false,
+        },
+      ];
+
+      // mock usage logs
+      // actionType = "take", "use", or "return"
+      let mockUsageLogs = [
+        {
+          materialID: 2,
+          userID: 2,
+          date: "2025-03-10",
+          time: "10:15",
+          takenAmount: 0,
+          actionType: "take",
+        },
+        {
+          materialID: 2,
+          userID: 2,
+          date: "2025-03-11",
+          time: "14:00",
+          takenAmount: 5,
+          actionType: "use",
+        },
+      ];
+
+      // mock notifications
+      // userID: which user sees it. If userID=null, it might be system-wide.
+      // Admin sees all.
+      let mockNotifications = [
+        {
+          id: 1,
+          date: "2025-03-15",
+          message:
+            "Reagent 'Tetrahydrofuran THF, dry' not returned for 7 days.",
+          userID: 2,
+        },
+        {
+          id: 2,
+          date: "2025-03-16",
+          message: "Reagent 'Acetone' is low on stock (25 L).",
+          userID: 2,
+        },
+      ];
+
+      /*
+       * SCREEN NAVIGATION
+       */
+      function showScreen(screenId) {
+        $(".screen").removeClass("active-screen");
+        $("#" + screenId).addClass("active-screen");
+        updateNavActive(screenId);
+      }
+
+      function updateNavActive(screenId) {
+        $("#navLinks li").removeClass("active");
+        if (screenId === "searchScreen") {
+          $("#navSearch").addClass("active");
+        } else if (screenId === "notificationsScreen") {
+          $("#navNotifications").addClass("active");
+        } else if (screenId === "adminScreen") {
+          $("#navAdmin").addClass("active");
+        }
+      }
+
+      // Populate navigation after login
+      function renderNav() {
+        let navHtml = `
+        <li class="nav-item">
+          <a class="nav-link pointer" id="navSearch">Search</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link pointer" id="navNotifications">Notifications</a>
+        </li>
+      `;
+
+        if (currentUser && currentUser.role === "admin") {
+          // Admin sees an extra link
+          navHtml += `
+          <li class="nav-item">
+            <a class="nav-link pointer" id="navAdmin">Admin</a>
+          </li>
+        `;
+        }
+
+        navHtml += `
+        <li class="nav-item">
+          <a class="nav-link pointer" id="navLogout">Logout</a>
+        </li>
+      `;
+
+        $("#navLinks").html(navHtml);
+        $("#currentUserInfo").text(
+          `${currentUser.userName} (${currentUser.role})`
+        );
+
+        // Attach events
+        $("#navSearch").click(() => {
+          renderReagents();
+          showScreen("searchScreen");
+        });
+        $("#navNotifications").click(() => {
+          renderUserNotifications();
+          showScreen("notificationsScreen");
+        });
+        $("#navLogout").click(() => {
+          currentUser = null;
+          $("#navLinks").html("");
+          $("#currentUserInfo").text("");
+          showScreen("loginScreen");
+        });
+        if (currentUser.role === "admin") {
+          $("#navAdmin").click(() => {
+            renderAdminScreen();
+            showScreen("adminScreen");
+          });
+        }
+      }
+
+      // LOGIN SUBMIT
+      $("#loginForm").submit(function (e) {
+        e.preventDefault();
+        let email = $("#emailInput").val().trim();
+        let pwd = $("#passwordInput").val().trim(); // mock, ignoring password
+
+        let found = mockUsers.find(
+          (u) => u.userEmail.toLowerCase() === email.toLowerCase()
+        );
+        if (found) {
+          currentUser = found;
+          renderNav();
+          renderReagents();
+          showScreen("searchScreen");
+        } else {
+          alert(
+            "Invalid credentials. Try 'admin@company.com' or 'user@company.com'. Password is ignored in this demo."
+          );
+        }
+      });
+
+      /*
+       * SEARCH & REAGENTS
+       */
+      $("#searchInput").on("input", function () {
+        renderReagents();
+      });
+
+      function renderReagents() {
+        let term = $("#searchInput").val().toLowerCase();
+        let filtered = mockReagents.filter((r) => {
+          return (
+            r.chemName.toLowerCase().includes(term) ||
+            r.synonyms.join(" ").toLowerCase().includes(term) ||
+            r.CASnum.toLowerCase().includes(term)
+          );
+        });
+
+        let html = "";
+        filtered.forEach((r) => {
+          let status = r.inStorage ? r.shelf : "Taken Out";
+          html += `
+          <tr class="pointer" onclick="showDetails(${r.materialID})">
+            <td>${r.materialID}</td>
+            <td>${r.chemName}</td>
+            <td>${status}</td>
+            <td>${r.remainAmount} ${r.units}</td>
+          </tr>
+        `;
+        });
+        $("#reagentsTableBody").html(html);
+      }
+
+      /*
+       * DETAILS SCREEN
+       */
+      $("#backToSearchBtn").click(() => showScreen("searchScreen"));
+
+      function showDetails(materialID) {
+        let reagent = mockReagents.find((r) => r.materialID === materialID);
+        if (!reagent) return;
+
+        // last "take" event for checking who currently has it
+        let lastTakeEvent = findLastTakeEvent(materialID);
+        let topSection = `
+        <p><strong>Remaining Amount:</strong> ${reagent.remainAmount} ${
+          reagent.units
+        }</p>
+        <p><strong>Shelf / Location:</strong> ${reagent.shelf}</p>
+        <p><strong>Status:</strong> ${
+          reagent.inStorage ? "In Storage" : "Taken Out"
+        }</p>
+      `;
+
+        if (!reagent.inStorage && lastTakeEvent) {
+          let user = mockUsers.find((u) => u.userID === lastTakeEvent.userID);
+          topSection += `
+          <p><strong>Taken By:</strong> ${user ? user.userName : "Unknown"}<br>
+          <strong>Taken On:</strong> ${lastTakeEvent.date} ${lastTakeEvent.time}
+          </p>
+        `;
+        }
+
+        // collapsible advanced info
+        let advInfo = `
+        <div class="collapse" id="collapseAdvInfo">
+          <div class="collapse-content">
+            <p><strong>Warehouse Code:</strong> ${reagent.WHcode}</p>
+            <p><strong>Synonyms:</strong> ${reagent.synonyms.join(", ")}</p>
+            <p><strong>Molecular Formula:</strong> ${reagent.bruttoF}</p>
+            <p><strong>CAS Number:</strong> ${reagent.CASnum}</p>
+            <p><strong>Retest/Expiration:</strong> ${reagent.retestExp}</p>
+            <p><strong>Arrived:</strong> ${reagent.arrived}</p>
+            <p><strong>Order Amount:</strong> ${reagent.orderAmount} ${
+          reagent.units
+        }</p>
+            <p><strong>Storage Temperature:</strong> ${reagent.storageTemp}</p>
+            <p><strong>MSDS:</strong> <a href="${
+              reagent.MSDS
+            }" target="_blank">View PDF</a></p>
+            <img src="${reagent.image}" alt="${reagent.chemName}" 
+                 style="max-width:150px; max-height:150px;">
+          </div>
+        </div>
+      `;
+        let advInfoBtn = `
+        <button class="btn btn-link p-0" type="button" data-toggle="collapse"
+          data-target="#collapseAdvInfo" aria-expanded="false" aria-controls="collapseAdvInfo">
+          Show/Hide Advanced Info
+        </button>
+      `;
+
+        // usage history collapsible
+        let historySection = `
+        <div class="collapse" id="collapseUsage">
+          <div class="collapse-content">
+            ${renderUsageHistory(materialID)}
+          </div>
+        </div>
+      `;
+        let historyBtn = `
+        <button class="btn btn-link p-0" type="button" data-toggle="collapse"
+          data-target="#collapseUsage" aria-expanded="false" aria-controls="collapseUsage">
+          Show/Hide Usage History
+        </button>
+      `;
+
+        // action buttons
+        let actionButtons = "";
+        if (reagent.inStorage) {
+          // If in storage, show "Take Out" button
+          actionButtons = `
+          <button class="btn btn-success mt-2" onclick="takeOutReagent(${reagent.materialID})">
+            Take Out
+          </button>
+        `;
+        } else {
+          // If user has it (and it’s the same user who took it), show "Register Usage" + "Return"
+          if (lastTakeEvent && lastTakeEvent.userID === currentUser.userID) {
+            actionButtons = `
+            <button class="btn btn-info mt-2" onclick="registerUsage(${reagent.materialID})">
+              Register Usage
+            </button>
+            <button class="btn btn-warning mt-2 ml-2" onclick="returnReagent(${reagent.materialID})">
+              Return
+            </button>
+          `;
+          } else {
+            // Another user has it, or no valid "take" event
+            actionButtons = `<p>This reagent is currently taken by another user.</p>`;
+          }
+        }
+
+        let detailHtml = `
+        ${topSection}
+        ${advInfoBtn} | ${historyBtn}
+        <br>${advInfo}${historySection}
+        <hr>
+        ${actionButtons}
+      `;
+        $("#detailsContent").html(detailHtml);
+        showScreen("detailsScreen");
+      }
+
+      // Find the most recent "take" event for the specified reagent
+      function findLastTakeEvent(materialID) {
+        // Filter logs for that reagent, actionType === "take"
+        let takeLogs = mockUsageLogs.filter(
+          (l) => l.materialID === materialID && l.actionType === "take"
+        );
+        if (takeLogs.length === 0) return null;
+        // Sort by date/time or just pick the last in array if we assume they are chronological
+        return takeLogs[takeLogs.length - 1];
+      }
+
+      // Render usage history
+      function renderUsageHistory(materialID) {
+        let logs = mockUsageLogs.filter((l) => l.materialID === materialID);
+        if (logs.length === 0) return "<p>No usage history.</p>";
+        let html = `<table class="table table-sm usage-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+      `;
+        logs.forEach((l) => {
+          let usr = mockUsers.find((u) => u.userID === l.userID);
+          html += `
+          <tr>
+            <td>${l.date}</td>
+            <td>${l.time}</td>
+            <td>${usr ? usr.userName : "Unknown"}</td>
+            <td>${l.actionType}</td>
+            <td>${l.takenAmount} ${getUnits(materialID)}</td>
+          </tr>
+        `;
+        });
+        html += `</tbody></table>`;
+        return html;
+      }
+
+      function getUnits(materialID) {
+        let r = mockReagents.find((x) => x.materialID === materialID);
+        return r ? r.units : "";
+      }
+
+      /*
+       * TAKE, USE, RETURN
+       */
+      function takeOutReagent(materialID) {
+        let reagent = mockReagents.find((r) => r.materialID === materialID);
+        if (!reagent || !reagent.inStorage) return;
+        // Mark as taken out
+        reagent.inStorage = false;
+        let now = new Date();
+        mockUsageLogs.push({
+          materialID: reagent.materialID,
+          userID: currentUser.userID,
+          date: now.toISOString().split("T")[0],
+          time: now.toTimeString().split(" ")[0].slice(0, 5),
+          takenAmount: 0,
+          actionType: "take",
+        });
+        alert("You have taken this reagent.");
+        showDetails(materialID);
+        renderReagents();
+      }
+
+      // Register usage while the reagent is out
+      function registerUsage(materialID) {
+        let reagent = mockReagents.find((r) => r.materialID === materialID);
+        if (!reagent || reagent.inStorage) return;
+        let amountStr = prompt(
+          "How much did you use? (in " + reagent.units + ")"
+        );
+        if (amountStr === null) return; // canceled
+        let amountUsed = parseFloat(amountStr);
+        if (isNaN(amountUsed) || amountUsed < 0) {
+          alert("Invalid amount.");
+          return;
+        }
+        // Check if usage is more than remain
+        if (amountUsed > reagent.remainAmount) {
+          // Optionally, let user request admin correction
+          let confirmMsg = `You are using more than what's recorded ( ${reagent.remainAmount} ). 
+Request admin to correct DB if it's outdated.\n\nProceed anyway?`;
+          let proceed = confirm(confirmMsg);
+          if (!proceed) return;
+          // If user still proceeds, we record usage, but remain might go negative
+        }
+        reagent.remainAmount -= amountUsed;
+        if (reagent.remainAmount < 0) reagent.remainAmount = 0; // just clamp it in mock
+
+        let now = new Date();
+        mockUsageLogs.push({
+          materialID: reagent.materialID,
+          userID: currentUser.userID,
+          date: now.toISOString().split("T")[0],
+          time: now.toTimeString().split(" ")[0].slice(0, 5),
+          takenAmount: amountUsed,
+          actionType: "use",
+        });
+
+        alert("Usage registered.");
+        showDetails(materialID);
+        renderReagents();
+      }
+
+      // Return the reagent to storage
+      function returnReagent(materialID) {
+        let reagent = mockReagents.find((r) => r.materialID === materialID);
+        if (!reagent || reagent.inStorage) return;
+
+        // Check if user logged usage after the last take
+        let lastTake = findLastTakeEvent(materialID);
+        let usageAfterTake = mockUsageLogs.filter(
+          (l) =>
+            l.materialID === materialID &&
+            l.actionType === "use" &&
+            l.date + l.time > lastTake.date + lastTake.time && // naive string compare
+            l.userID === currentUser.userID
+        );
+        if (usageAfterTake.length === 0) {
+          // No usage logged
+          let confirmNoUsage = confirm(
+            "You have not registered any consumption. Are you sure you want to return?"
+          );
+          if (!confirmNoUsage) return;
+        }
+
+        reagent.inStorage = true;
+        let now = new Date();
+        mockUsageLogs.push({
+          materialID: reagent.materialID,
+          userID: currentUser.userID,
+          date: now.toISOString().split("T")[0],
+          time: now.toTimeString().split(" ")[0].slice(0, 5),
+          takenAmount: 0,
+          actionType: "return",
+        });
+        alert("Reagent returned to storage.");
+        showDetails(materialID);
+        renderReagents();
+      }
+
+      /*
+       * NOTIFICATIONS
+       * - Regular users see only their notifications or userID = null
+       * - Admin sees them all in admin screen
+       */
+      function renderUserNotifications() {
+        let html = "";
+        // Show notifications addressed to currentUser or userID=null
+        let filtered = mockNotifications.filter((n) => {
+          return n.userID === currentUser.userID || n.userID === null;
+        });
+
+        if (filtered.length === 0) {
+          html = `<li class="list-group-item">No notifications found.</li>`;
+        } else {
+          filtered.forEach((n) => {
+            html += `
+            <li class="list-group-item">
+              <strong>${n.date}:</strong> ${n.message}
+            </li>
+          `;
+          });
+        }
+        $("#notificationsList").html(html);
+      }
+
+      /*
+       * ADMIN SCREEN
+       */
+      function renderAdminScreen() {
+        // All notifications
+        let notifHtml = "";
+        if (mockNotifications.length === 0) {
+          notifHtml = `<tr><td colspan="3">No notifications.</td></tr>`;
+        } else {
+          mockNotifications.forEach((n) => {
+            notifHtml += `
+            <tr>
+              <td>${n.date}</td>
+              <td>${n.message}</td>
+              <td>${n.userID !== null ? n.userID : "All/None"}</td>
+            </tr>
+          `;
+          });
+        }
+        $("#adminNotificationsTable").html(notifHtml);
+
+        // All users
+        let usersHtml = "";
+        mockUsers.forEach((u) => {
+          usersHtml += `
+          <tr>
+            <td>${u.userID}</td>
+            <td>${u.userName}</td>
+            <td>${u.userEmail}</td>
+            <td>${u.role}</td>
+          </tr>
+        `;
+        });
+        $("#adminUsersTable").html(usersHtml);
+
+        // All reagents
+        let reagHtml = "";
+        mockReagents.forEach((r) => {
+          reagHtml += `
+          <tr>
+            <td>${r.materialID}</td>
+            <td>${r.chemName}</td>
+            <td>${r.remainAmount} ${r.units}</td>
+            <td>${r.shelf}</td>
+          </tr>
+        `;
+        });
+        $("#adminReagentsTable").html(reagHtml);
+      }
+
+      /*
+       * ON PAGE LOAD
+       */
+      $(document).ready(function () {
+        showScreen("loginScreen");
+      });
+    </script>
+  </body>
+</html>
